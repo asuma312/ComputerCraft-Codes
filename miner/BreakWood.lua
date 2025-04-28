@@ -33,7 +33,7 @@ function LookAroundForTree(moves)
         move = movements[i]
         local success, data = turtle.inspect()
         if success then
-            if data.name == "minecraft:oak_log" or data.name == "minecraft:birch_log" then
+            if data.name == "minecraft:oak_log" or data.name == "minecraft:birch_log" or data.name == "minecraft:spruce_log" then
                 print("Found tree on i=" .. i)
                 if moves == nil then
                     return true
@@ -60,7 +60,7 @@ function FindTree()
         LookAroundForTree()
         local success, data = turtle.inspect()
         if success then
-            if data.name == "minecraft:oak_log" or data.name == "minecraft:birch_log" then
+            if data.name == "minecraft:oak_log" or data.name == "minecraft:birch_log" or data.name =="minecraft:spruce_log" then
                 print("Found tree")
                 found = true
                 return true
@@ -82,7 +82,7 @@ function BreakUpTree()
     while true do
         local sucess,upper_block = turtle.inspectUp()
         if sucess then
-            if upper_block.name == "minecraft:oak_log" or upper_block.name == "minecraft:birch_log" then
+            if upper_block.name == "minecraft:oak_log" or upper_block.name == "minecraft:birch_log" or upper_block.name == 'minecraft:spruce_log' then
                 turtle.digUp()
                 turtle.up()
                 moves[#moves + 1] = {
@@ -123,7 +123,7 @@ function BreakAndStoreTree()
     GoDownTree()
     local moves = {}
     BreakUpTree()
-    ReturnToStart()
+    GoToGroundLevel()
 end
 
 BreakAndStoreTree()

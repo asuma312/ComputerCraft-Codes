@@ -63,12 +63,7 @@ function COORDS.move(MOVEMENT)
             COORDS.Y = COORDS.Y + 1 
         end
     elseif direction == "down" then
-        local inspectSuccess = turtle.inspectDown()
-        if not inspectSuccess then
-            turtle.digDown()
-        else
-            print("Não pode quebrar, tem uma tocha")
-        end
+        turtle.digDown()
         success = turtle.down()
         if success then 
             COORDS.Y = COORDS.Y - 1 
@@ -157,8 +152,17 @@ function COORDS.MoveToCords(local_X,local_Y,local_Z)
     print("Local alvo - X=" .. local_X .. ", Y=" .. local_Y .. ", Z=" .. local_Z)
     while not COORDS.SingleMoveToCords(local_X,local_Y,local_Z) do
     end
-    turnToDirection(COORDS.DIRECTIONS.NORTH)
+    COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
     print("Finished moving to target coordinates.")
+end
+
+function COORDS.getPosition()
+    return {
+        X = COORDS.X,
+        Y = COORDS.Y,
+        Z = COORDS.Z,
+        DIRECTION = COORDS.DIRECTION
+    }
 end
 
 return COORDS

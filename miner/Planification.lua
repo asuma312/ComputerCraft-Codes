@@ -17,7 +17,13 @@ Z_END = tonumber(read())
 
 function Planification()
     --first break until are in X-START and Z-START
-    COORDS.MoveToCords(X_START, COORDS.Y, Z_START)
+    for i = 1,BLOCKS_HEIGHT do
+        i = i - 1
+        COORDS.MoveToCords(X_START, COORDS.Y + i, Z_START)
+        COORDS.MoveToCords(X_START,COORDS.Y,Z_END)
+        COORDS.MoveToCords(X_END, COORDS.Y, Z_END)
+        COORDS.MoveToCords(X_END, COORDS.Y, Z_START)
+    end
 end
 
 Planification()

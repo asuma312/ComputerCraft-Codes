@@ -1,3 +1,4 @@
+require("Coordinates")
 turtle = turtle
 shell = shell
 
@@ -5,12 +6,15 @@ shell = shell
 COBBLESTONE_SLOT = 1
 CHEST_SLOT = 2
 TORCH_SLOT = 16
-DIRECTION = "NORTH"
+CHUNK_LOADERS_SLOT = 3
 RETURN_COORDS = {X = 0, Y = 0, Z = 0}
 CHEST_COORDS = {X = 0, Y = 0, Z = 0}
-X, Y, Z = 0, 0, 0
+CHUNK_LOADER_COORDS = {X = 0, Y = 0, Z = 0}
 BLOCKS_PER_TORCH = 8
 CURRENT_BLOCKS_WITHOUT_TORCH = 8
+
+CHUNK_LOADER_BLOCKS = 20
+CURRENT_CHUNK_LOADER_BLOCKS = 20
 
 PLACES_TO_LOOK = {}
 
@@ -31,92 +35,25 @@ function has_value(tab, val)
     return false
 end
 
--- Funções de movimento com atualização de coordenadas
-function move(direction)
-    local success = false
-    
-    if direction == "forward" then
-        turtle.dig()
-        success = turtle.forward()
-        if success then
-            if DIRECTION == "NORTH" then Z = Z - 1
-            elseif DIRECTION == "SOUTH" then Z = Z + 1
-            elseif DIRECTION == "EAST" then X = X + 1
-            elseif DIRECTION == "WEST" then X = X - 1
-            end
-        end
-    elseif direction == "up" then
-        turtle.digUp()
-        success = turtle.up()
-        if success then Y = Y + 1 end
-    elseif direction == "down" then
-        local inspectSuccess, block = turtle.inspectDown()
-        print(block.name)
-        if (inspectSuccess and block.name ~= "minecraft:wall_torch") then
-            turtle.digDown()
-        else
-            print("Não pode quebrar, tem uma tocha")
-        end
-        success = turtle.down()
-        if success then Y = Y - 1 end
-    end
-    
-    return success
-end
-
--- Funções de rotação otimizadas
-function turnLeft()
-    turtle.turnLeft()
-    if DIRECTION == "NORTH" then DIRECTION = "WEST"
-    elseif DIRECTION == "WEST" then DIRECTION = "SOUTH"
-    elseif DIRECTION == "SOUTH" then DIRECTION = "EAST"
-    elseif DIRECTION == "EAST" then DIRECTION = "NORTH"
-    end
-end
-
-function turnRight()
-    turtle.turnRight()
-    if DIRECTION == "NORTH" then DIRECTION = "EAST"
-    elseif DIRECTION == "EAST" then DIRECTION = "SOUTH"
-    elseif DIRECTION == "SOUTH" then DIRECTION = "WEST"
-    elseif DIRECTION == "WEST" then DIRECTION = "NORTH"
-    end
-end
-
--- Função otimizada para virar para uma direção específica
-function turnToDirection(targetDirection)
-    if DIRECTION == targetDirection then return end
-    
-    if (DIRECTION == "NORTH" and targetDirection == "EAST") or
-       (DIRECTION == "EAST" and targetDirection == "SOUTH") or
-       (DIRECTION == "SOUTH" and targetDirection == "WEST") or
-       (DIRECTION == "WEST" and targetDirection == "NORTH") then
-        turnRight()
-    else
-        turnLeft()
-    end
-    
-    if DIRECTION ~= targetDirection then
-        turnToDirection(targetDirection)
-    end
-end
+-- As funções de movimento e rotação agora são providas por Coordinates.lua:
+-- Use COORDS.move(direction), COORDS.turnLeft(), COORDS.turnRight(), COORDS.turnToDirection(direction)
 
 -- Função para ir ao chão
 function GoToGroundLevel()
     while not turtle.inspectDown() do
-        move("down")
+        COORDS.move(COORDS.MOVEMENTS.DOWN)
     end
-    print("Chegou ao nível do chão. Camada atual: " .. Y)
+    print("Chegou ao nível do chão. Camada atual: " .. COORDS.Y)
 end
 
 -- Verificar se está na camada desejada
 function IsInDeterminedRange()
-    Y = tonumber(Y)
+    COORDS.Y = tonumber(COORDS.Y)
     camada_start = tonumber(camada_start)
     
-    if Y == camada_start then
+    if COORDS.Y == camada_start then
         return true
-    elseif Y < camada_start then
+    elseif COORDS.Y < camada_start then
         return "below"
     else
         return false
@@ -142,7 +79,8 @@ end
 -- Reabastecer a turtle
 function MakeRefuel()
     local fuel_types = {"minecraft:coal", "minecraft:charcoal", "minecraft:oak_log"}
-    local target_fuel = 100
+    --1 stack de carvao é 5250, 5500 é uma medida aceitavel pra n desperdiçar combustivel
+    local target_fuel = turtle.getFuelLimit() - 5500
     local current_fuel = turtle.getFuelLevel()
     
     if current_fuel >= target_fuel then
@@ -155,10 +93,11 @@ function MakeRefuel()
         if item and has_value(fuel_types, item.name) then
             print("Usando " .. item.name .. " como combustível")
             turtle.select(i)
+            local item_count = turtle.getItemCount()
             
             print("Reabastecendo de " .. current_fuel .. " até " .. target_fuel)
             while turtle.getFuelLevel() < target_fuel do
-                if not turtle.refuel(1) then
+                if not turtle.refuel(item_count) then
                     print("Falha ao reabastecer")
                     return false
                 end
@@ -177,11 +116,11 @@ end
 function BuildCircleStairway()
     turtle.digUp()
     turtle.digDown()
-    move("down")
-    turnRight()
+    COORDS.move(COORDS.MOVEMENTS.DOWN)
+    COORDS.turnRight()
     turtle.dig()
-    move("forward")
-    print("Construída escada em espiral. Nova camada: " .. Y)
+    COORDS.move(COORDS.MOVEMENTS.FORWARD)
+    print("Construída escada em espiral. Nova camada: " .. COORDS.Y)
 end
 
 -- Ir para camada específica
@@ -190,12 +129,12 @@ function GoToSpecificLayer(build_stars)
         local status = IsInDeterminedRange()
         
         if status == true then
-            print("Chegou à camada desejada: " .. Y)
+            print("Chegou à camada desejada: " .. COORDS.Y)
             return
         elseif status == "below" then
-            print("Abaixo da camada alvo. Subindo de " .. Y .. " para " .. camada_start)
+            print("Abaixo da camada alvo. Subindo de " .. COORDS.Y .. " para " .. camada_start)
             while IsInDeterminedRange() == "below" do
-                move("up")
+                COORDS.move(COORDS.MOVEMENTS.UP)
             end
             turtle.placeDown()
             return
@@ -204,7 +143,7 @@ function GoToSpecificLayer(build_stars)
         if build_stars then
             BuildCircleStairway()
         else
-            move("down")
+            COORDS.move(COORDS.MOVEMENTS.DOWN)
         end
 
         FixInventory()
@@ -219,18 +158,18 @@ end
 
 -- Funções de mineração e verificação otimizadas
 function MineAround(direction)
-    local current_x, current_y, current_z = X, Y, Z
-    local current_direction = DIRECTION
+    local current_x, current_y, current_z = COORDS.X, COORDS.Y, COORDS.Z
+    local current_direction = COORDS.DIRECTION
     
     if direction == "up" then
-        move("up")
+        COORDS.move(COORDS.MOVEMENTS.UP)
     elseif direction == "down" then
-        move("down")
+        COORDS.move(COORDS.MOVEMENTS.DOWN)
     else
-        move("forward")
+        COORDS.move(COORDS.MOVEMENTS.FORWARD)
     end
     
-    print("Minerando em: X=" .. X .. ", Y=" .. Y .. ", Z=" .. Z .. ", Direção=" .. DIRECTION)
+    print("Minerando em: X=" .. COORDS.X .. ", Y=" .. COORDS.Y .. ", Z=" .. COORDS.Z .. ", Direção=" .. COORDS.DIRECTION)
     return VerifyAround()
 end
 
@@ -238,14 +177,15 @@ end
 function VerifyAround(place_to_look, should_return)
     if place_to_look == nil then
         place_to_look = {
-            X = X,
-            Y = Y,
-            Z = Z,
+            X = COORDS.X,
+            Y = COORDS.Y,
+            Z = COORDS.Z,
             UP = false,
             DOWN = false,
             NORTH = false,
             EAST = false,
             WEST = false,
+            SOUTH = false,
         }
         
         local place_to_look_id = #PLACES_TO_LOOK + 1
@@ -268,7 +208,7 @@ function VerifyAround(place_to_look, should_return)
 
     if not place_to_look.WEST then
         -- Verificar à esquerda
-        turnToDirection('WEST')
+        COORDS.turnToDirection(COORDS.DIRECTIONS.WEST)
         success, block = turtle.inspect()
         if success and IsOre(block) then
             print("Encontrado minério: " .. block.name)
@@ -276,12 +216,12 @@ function VerifyAround(place_to_look, should_return)
             return true
         end
         place_to_look.WEST = true
-        turnToDirection('NORTH')
+        COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
     end
     
     if not place_to_look.EAST then
         -- Verificar à direita
-        turnToDirection('EAST')
+        COORDS.turnToDirection(COORDS.DIRECTIONS.EAST)
         success, block = turtle.inspect()
         if success and IsOre(block) then
             print("Encontrado minério: " .. block.name)
@@ -289,7 +229,20 @@ function VerifyAround(place_to_look, should_return)
             return true
         end
         place_to_look.EAST = true
-        turnToDirection('NORTH')
+        COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
+    end
+
+    if not place_to_look.SOUTH then
+        -- Verificar atrásx
+        COORDS.turnToDirection(COORDS.DIRECTIONS.SOUTH)
+        success, block = turtle.inspect()
+        if success and IsOre(block) then
+            print("Encontrado minério: " .. block.name)
+            MineAround()
+            return true
+        end
+        place_to_look.SOUTH = true
+        COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
     end
         
 
@@ -336,47 +289,21 @@ function LookOldPlaces()
         local selected_place = PLACES_TO_LOOK[i]
         if selected_place.NORTH and  
         selected_place.EAST and selected_place.WEST and 
-        selected_place.UP and selected_place.DOWN then
+        selected_place.UP and selected_place.DOWN and selected_place.SOUTH
+        then
          print("Verificado todos os lados")
          table.remove(PLACES_TO_LOOK, i)
         else
             print("Verificando lugar: " .. selected_place.X .. ", " .. selected_place.Y .. ", " .. selected_place.Z)
             
-            while not ReturnToSpecificCoordinate(selected_place.X, selected_place.Y, selected_place.Z) do
-                print("Retornando")
-            end
+            COORDS.MoveToCords(selected_place.X, selected_place.Y, selected_place.Z) do
             
             VerifyAround(selected_place, true)
             i = i - 1
         end      
     end
-    
 end
-
-function ReturnToSpecificCoordinate(local_X,local_Y,local_Z)
-    print("Local atual - X=" .. X .. ", Y=" .. Y .. ", Z=" .. Z)
-    print("Local alvo - X=" .. local_X .. ", Y=" .. local_Y .. ", Z=" .. local_Z)
-    if X < local_X then
-        turnToDirection("EAST")
-        move("forward")
-    elseif X > local_X then
-        turnToDirection("WEST")
-        move("forward")
-    elseif Z < local_Z then
-        turnToDirection("SOUTH")
-        move("forward")
-    elseif Z > local_Z then
-        turnToDirection("NORTH")
-        move("forward")
-    elseif Y < local_Y then
-        move("up")
-    elseif Y > local_Y then
-        move("down")
-    else
-        turnToDirection("NORTH")
-        print("Retorno concluído")
-        return true
-    end    
+    
 end
 
 
@@ -385,14 +312,14 @@ function ReturnToCoordinates()
     LookOldPlaces()
     print("Retornando para: X=" .. RETURN_COORDS.X .. ", Y=" .. RETURN_COORDS.Y .. ", Z=" .. RETURN_COORDS.Z)
     
-    while not ReturnToSpecificCoordinate(RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z) do
-    end
+    COORDS.MoveToCords(RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z)
+    
 end
 
 -- Verificar baú e gerenciar itens
 function VerifyChest()
     local success, block = turtle.inspect()
-    return success and block.name == "quark:oak_chest"
+    return success and block.name ==  "enderchests:ender_chest"
 end
 
 -- Otimização da função de retorno ao baú
@@ -400,27 +327,28 @@ function ReturnToChest()
     print("Retornando para o baú: X=" .. CHEST_COORDS.X .. ", Y=" .. CHEST_COORDS.Y .. ", Z=" .. CHEST_COORDS.Z)
     
     -- Ajustar altura
-    while Y < CHEST_COORDS.Y do move("up") end
-    while Y > CHEST_COORDS.Y do move("down") end
+    while COORDS.Y < CHEST_COORDS.Y do COORDS.move(COORDS.MOVEMENTS.UP) end
+    while COORDS.Y > CHEST_COORDS.Y do COORDS.move(COORDS.MOVEMENTS.DOWN) end
     
     -- Ajustar X
-    if X ~= CHEST_COORDS.X then
-        turnToDirection(X < CHEST_COORDS.X and "EAST" or "WEST")
-        while X ~= CHEST_COORDS.X do move("forward") end
+    if COORDS.X ~= CHEST_COORDS.X then
+        COORDS.turnToDirection(COORDS.X < CHEST_COORDS.X and COORDS.DIRECTIONS.EAST or COORDS.DIRECTIONS.WEST)
+        while COORDS.X ~= CHEST_COORDS.X do COORDS.move(COORDS.MOVEMENTS.FORWARD) end
     end
     
     -- Ajustar Z
-    if Z ~= CHEST_COORDS.Z then
-        turnToDirection(Z < CHEST_COORDS.Z and "SOUTH" or "NORTH")
-        while Z ~= CHEST_COORDS.Z do move("forward") end
+    if COORDS.Z ~= CHEST_COORDS.Z then
+        COORDS.turnToDirection(COORDS.Z < CHEST_COORDS.Z and COORDS.DIRECTIONS.SOUTH or COORDS.DIRECTIONS.NORTH)
+        while COORDS.Z ~= CHEST_COORDS.Z do COORDS.move(COORDS.MOVEMENTS.FORWARD) end
     end
 end
 
 -- Armazenar itens no baú
 function StoreItems()
     print("Armazenando itens no baú")
-    ReturnToChest()
-    turnToDirection("SOUTH")
+    COORDS.turnToDirection(COORDS.DIRECTIONS.SOUTH)
+    turtle.select(CHEST_SLOT)
+    turtle.place()
     
     if not VerifyChest() then
         print("Baú não encontrado. Retornando para a posição original.")
@@ -431,14 +359,28 @@ function StoreItems()
     turtle.refuel(64)
     for i = 1, 16 do
         local item = turtle.getItemDetail(i)
-        if item and i ~= COBBLESTONE_SLOT and i ~= TORCH_SLOT then
+        if item and i ~= COBBLESTONE_SLOT and i ~= TORCH_SLOT and i~=CHUNK_LOADERS_SLOT then
             print("Colocando " .. item.name .. " no baú")
             turtle.select(i)
             turtle.drop()
         end
     end
+
+    turtle.dig()
+
+    for i=1, 16 do 
+        local item = turtle.getItemDetail(i)
+        if item then 
+            if item.name == 'enderchests:ender_chest' then 
+                turtle.select(i)
+                local count = turtle.getItemCount()
+                turtle.transferTo(CHEST_SLOT, count)
+                break
+            end
+        end
+    end
     
-    turnToDirection("NORTH")
+    COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
     print("Itens armazenados com sucesso")
     return true
 end
@@ -465,19 +407,7 @@ function PlaceSideBlock()
     if not success then
         print("Colocando bloco lateral")
         turtle.place()
-    elseif block.name == 'minecraft:air' then
-        print("Colocando bloco lateral")
-        turtle.place()
-    elseif block.name == 'minecraft:water' then
-        print("Colocando bloco lateral")
-        turtle.place()
-    elseif block.name == 'minecraft:flowing_water' then
-        print("Colocando bloco lateral")
-        turtle.place()
-    elseif block.name == 'minecraft:lava' then
-        print("Colocando bloco lateral")
-        turtle.place()
-    elseif block.name == 'minecraft:flowing_lava' then
+    elseif block.name ~= 'minecraft:wall_torch' and block.name ~= 'weirdinggadget:weirding_gadget' then
         print("Colocando bloco lateral")
         turtle.place()
     end
@@ -506,38 +436,89 @@ function PlaceUpBlock()
     end
 end
 
+
+function VerifyChunkLoader()
+    if CURRENT_CHUNK_LOADER_BLOCKS >= CHUNK_LOADER_BLOCKS then
+        return true
+    end
+    return false
+end
+
+function SetupChunkLoader(is_first_time)
+    if not VerifyChunkLoader() then
+        return
+    end
+    RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = COORDS.X, COORDS.Y, COORDS.Z
+
+    local temp_x = COORDS.X
+    local temp_y = COORDS.Y
+    local temp_z = COORDS.Z
+
+    turtle.select(CHUNK_LOADERS_SLOT)
+    COORDS.turnToDirection(COORDS.DIRECTIONS.EAST)
+    turtle.dig()
+    turtle.place()
+    CURRENT_CHUNK_LOADER_BLOCKS = 0
+
+    if is_first_time then
+        CHUNK_LOADER_COORDS.X = temp_x
+        CHUNK_LOADER_COORDS.Y = temp_y
+        CHUNK_LOADER_COORDS.Z = temp_z
+        return
+    end
+
+    COORDS.MoveToCords(CHUNK_LOADER_COORDS.X, CHUNK_LOADER_COORDS.Y, CHUNK_LOADER_COORDS.Z)
+    COORDS.turnToDirection(COORDS.DIRECTIONS.EAST)
+    turtle.dig()
+    for i=1, 16 do
+        slot = turtle.getItemDetail(i)
+        if not slot then
+            print("Sem item")
+        elseif slot.name == 'weirdinggadget:weirding_gadget' then
+            turtle.select(i)
+            count = turtle.getItemCount()
+            turtle.transferTo(CHUNK_LOADERS_SLOT,count)
+            break
+        end
+    end
+    
+    COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
+    ReturnToCoordinates()
+
+    CHUNK_LOADER_COORDS.X = temp_x
+    CHUNK_LOADER_COORDS.Y = temp_y
+    CHUNK_LOADER_COORDS.Z = temp_z
+
+end
+
 -- Função principal de mineração
 function StripMine()
     local numbers_to_dig = tonumber(camada_end) - tonumber(camada_start)
     
     turtle.digUp()
     
-    CHEST_COORDS.X = X
-    CHEST_COORDS.Y = Y
-    CHEST_COORDS.Z = Z
+    CHEST_COORDS.X = COORDS.X
+    CHEST_COORDS.Y = COORDS.Y
+    CHEST_COORDS.Z = COORDS.Z
     print("Coordenadas do baú: X=" .. CHEST_COORDS.X .. ", Y=" .. CHEST_COORDS.Y .. ", Z=" .. CHEST_COORDS.Z)
-    
-    turnToDirection("SOUTH")
-    turtle.select(CHEST_SLOT)
-    turtle.place()
-    turnToDirection("NORTH")
-    print("Baú colocado na camada: " .. Y)
     
     if not StoreItems() then
         print("Falha ao armazenar itens. Abortando.")
         return false
     end
+    SetupChunkLoader(true)
 
     while true do
-        print("Direção atual: " .. DIRECTION)
-        
+        print("Direção atual: " .. COORDS.DIRECTION)
+    
         -- Salvar coordenadas atuais como ponto de retorno
-        RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = X, Y, Z
-        turnToDirection("NORTH")
-        move("forward")
+        RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = COORDS.X, COORDS.Y, COORDS.Z
+        COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
+        COORDS.move(COORDS.MOVEMENTS.FORWARD)
 
         CURRENT_BLOCKS_WITHOUT_TORCH = CURRENT_BLOCKS_WITHOUT_TORCH + 1
-        RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = X, Y, Z
+        CURRENT_CHUNK_LOADER_BLOCKS = CURRENT_CHUNK_LOADER_BLOCKS + 1
+        RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = COORDS.X, COORDS.Y, COORDS.Z
         
         -- Verificar minérios ao redor
         local verify_around = VerifyAround()
@@ -546,35 +527,35 @@ function StripMine()
         print("Verificando " .. numbers_to_dig .. " camadas acima")
         for i = 1, numbers_to_dig do
             print("Verificando bloco " .. i .. " acima")
-            move("up")
+            COORDS.move(COORDS.MOVEMENTS.UP)
             
             -- Colocar tocha se necessário
             if CURRENT_BLOCKS_WITHOUT_TORCH >= BLOCKS_PER_TORCH and i == 1 then
                 print("Colocando tocha")
                 turtle.select(16)
-                turnToDirection("EAST")
+                COORDS.turnToDirection(COORDS.DIRECTIONS.EAST)
                 turtle.dig()
                 turtle.place()
-                turnToDirection("NORTH")
+                COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
                 CURRENT_BLOCKS_WITHOUT_TORCH = 0
             end
 
             -- Salvar coordenadas e verificar minérios
-            RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = X, Y, Z
+            RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = COORDS.X, COORDS.Y, COORDS.Z
             local verify_around = VerifyAround()
          
             -- Verificar e preencher espaços vazios nas laterais
             turtle.select(COBBLESTONE_SLOT)
             
-            turnToDirection("EAST")
+            COORDS.turnToDirection(COORDS.DIRECTIONS.EAST)
             PlaceSideBlock()
 
-            turnToDirection("WEST")
+            COORDS.turnToDirection(COORDS.DIRECTIONS.WEST)
             PlaceSideBlock()
-
-            PlaceUpBlock()
-
-            turnToDirection("NORTH")
+            if i == numbers_to_dig then
+                PlaceUpBlock()
+            end
+            COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
         end
 
         -- Verificar e preencher espaço vazio acima
@@ -586,7 +567,7 @@ function StripMine()
         
         -- Voltar para a camada original
         for i = 1, numbers_to_dig do
-            move("down")
+            COORDS.move(COORDS.MOVEMENTS.DOWN)
         end
         
         -- Manutenção
@@ -596,7 +577,7 @@ function StripMine()
         
         -- Verificar inventário cheio
         if VerifyFullInventory() then
-            RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = X, Y, Z
+            RETURN_COORDS.X, RETURN_COORDS.Y, RETURN_COORDS.Z = COORDS.X, COORDS.Y, COORDS.Z
             print("Inventário cheio. Retornando para o baú.")
             if not StoreItems() then
                 print("Falha ao armazenar itens. Abortando.")
@@ -604,6 +585,7 @@ function StripMine()
             end
             ReturnToCoordinates()
         end
+        SetupChunkLoader()
     end
 end
 
@@ -611,26 +593,29 @@ end
 local first_slot_item = turtle.getItemDetail(COBBLESTONE_SLOT)
 local chest_slot_item = turtle.getItemDetail(CHEST_SLOT)
 local torch_slot_item = turtle.getItemDetail(TORCH_SLOT)
+local chunk_loader_slot = turtle.getItemDetail(CHUNK_LOADERS_SLOT)
 
 -- Verificação inicial de itens
 if first_slot_item == nil then
     print("Nenhum item encontrado no slot " .. COBBLESTONE_SLOT)
-    shell.exit()
 elseif first_slot_item.name ~= "minecraft:cobblestone" then
     print("Item no slot " .. COBBLESTONE_SLOT .. " não é cobblestone")
-    shell.exit()
 elseif chest_slot_item == nil then
     print("Nenhum item encontrado no slot " .. CHEST_SLOT)
-    shell.exit()
-elseif chest_slot_item.name ~= "quark:oak_chest" then
+elseif chest_slot_item.name ~= "enderchests:ender_chest" then
     print("Item no slot " .. CHEST_SLOT .. " não é um baú")
-    shell.exit()
 elseif torch_slot_item == nil then
-    print("Nenhum item encontrado no slot " .. TORCH_SLOT)
-    shell.exit()
+    print("Nenhum item encontrado no slot da tocha(16)")
 elseif torch_slot_item.name ~= "minecraft:torch" then
     print("Item no slot " .. TORCH_SLOT .. " não é uma tocha")
-    shell.exit()
+elseif chunk_loader_slot == nil then
+    print("Nenhum item encontrado no slot do Chunk loader(3)")
+elseif chunk_loader_slot.name ~= "weirdinggadget:weirding_gadget" then
+    print()
+    print("O item no slot 3 não é um chunk loader")
+elseif turtle.getItemCount(CHUNK_LOADERS_SLOT) < 2 then
+    print("Precisa ter no minimo 2 chunk loaders pra funcionar")
+    
 else
     print('Melhor camada para ferro é 15 até 18')
     
@@ -650,9 +635,9 @@ else
     end
     
     write('Qual a camada atual > ')
-    Y = tonumber(read())
-    
-    print('Camada atual: ' .. Y)
+    COORDS.Y = tonumber(read())
+
+    print('Camada atual: ' .. COORDS.Y)
     print('Camada inicial: ' .. camada_start)
     print('Camada final: ' .. camada_end)
     write('Pressione ENTER para continuar')
