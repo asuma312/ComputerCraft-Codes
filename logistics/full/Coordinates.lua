@@ -48,7 +48,6 @@ function COORDS.SaveCoordinates(X,Y,Z,DIRECTION)
     local file = fs.open("coordinates.json", "w")
     file.write(json_data)
     file.close()
-    print("Coordinates saved to coordinates.json")
 end
 
 function COORDS.LoadCoordinates()
@@ -166,37 +165,51 @@ function COORDS.turnToDirection(direction)
 end
 
 
-function COORDS.SingleMoveToCords(local_X,local_Y,local_Z)
-    print("Local atual - X=" .. COORDS.X .. ", Y=" .. COORDS.Y .. ", Z=" .. COORDS.Z)
-    print("Local alvo - X=" .. local_X .. ", Y=" .. local_Y .. ", Z=" .. local_Z)
-    if COORDS.X < local_X then
-        COORDS.turnToDirection(COORDS.DIRECTIONS.EAST)
-        COORDS.move(COORDS.MOVEMENTS.FORWARD)
-    elseif COORDS.X > local_X then
-        COORDS.turnToDirection(COORDS.DIRECTIONS.WEST)
-        COORDS.move(COORDS.MOVEMENTS.FORWARD)
-    elseif COORDS.Z < local_Z then
-        COORDS.turnToDirection(COORDS.DIRECTIONS.SOUTH)
-        COORDS.move(COORDS.MOVEMENTS.FORWARD)
-    elseif COORDS.Z > local_Z then
-        COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
-        COORDS.move(COORDS.MOVEMENTS.FORWARD)
-    elseif COORDS.Y < local_Y then
-        COORDS.move(COORDS.MOVEMENTS.UP)
+function COORDS.SingleMoveToCords(local_X, local_Y, local_Z)
+
+
+    local attempts = {}
+
+    if COORDS.Y < local_Y then
+        table.insert(attempts, {move=COORDS.MOVEMENTS.UP})
     elseif COORDS.Y > local_Y then
-        COORDS.move(COORDS.MOVEMENTS.DOWN)
-    else
+        table.insert(attempts, {move=COORDS.MOVEMENTS.DOWN})
+    end
+
+    if COORDS.X < local_X then
+        table.insert(attempts, {turn=COORDS.DIRECTIONS.EAST, move=COORDS.MOVEMENTS.FORWARD})
+    elseif COORDS.X > local_X then
+        table.insert(attempts, {turn=COORDS.DIRECTIONS.WEST, move=COORDS.MOVEMENTS.FORWARD})
+    end
+
+    if COORDS.Z < local_Z then
+        table.insert(attempts, {turn=COORDS.DIRECTIONS.SOUTH, move=COORDS.MOVEMENTS.FORWARD})
+    elseif COORDS.Z > local_Z then
+        table.insert(attempts, {turn=COORDS.DIRECTIONS.NORTH, move=COORDS.MOVEMENTS.FORWARD})
+    end
+
+    for _, attempt in ipairs(attempts) do
+        if attempt.turn then
+            COORDS.turnToDirection(attempt.turn)
+        end
+        local success = COORDS.move(attempt.move)
+        if success then
+            return false
+        end
+    end
+
+    if COORDS.X == local_X and COORDS.Y == local_Y and COORDS.Z == local_Z then
         return true
-    end    
+    end
+
+    print("Nenhum movimento possível para o destino desejado.")
+    return false
 end
 
 function COORDS.MoveToCords(local_X,local_Y,local_Z)
-    print("Local atual - X=" .. COORDS.X .. ", Y=" .. COORDS.Y .. ", Z=" .. COORDS.Z)
-    print("Local alvo - X=" .. local_X .. ", Y=" .. local_Y .. ", Z=" .. local_Z)
     while not COORDS.SingleMoveToCords(local_X,local_Y,local_Z) do
     end
     COORDS.turnToDirection(COORDS.DIRECTIONS.NORTH)
-    print("Finished moving to target coordinates.")
 end
 
 function COORDS.getPosition()
